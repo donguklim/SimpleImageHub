@@ -55,7 +55,7 @@ def decode_access_token(token: str, secret_key: str) -> dict:
 def get_user_instance(user_info: UserDto) -> User:
     user = User(
         password=get_password_hash(user_info.password),
-        user_name=user_info.username,
+        user_name=user_info.user_name,
         is_admin=user_info.is_admin,
     )
 

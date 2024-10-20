@@ -12,3 +12,8 @@ class UserDto(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+
+class UserAuthDto(BaseModel):
+    user_id: int
+    is_admin: bool

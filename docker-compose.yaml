@@ -24,7 +24,7 @@ services:
       environment:
         - POSTGRES_USER=some_db_user
         - POSTGRES_PASSWORD=some#password
-        - POSTGRES_DB=car_dealing
+        - POSTGRES_DB=image_hub
 
 volumes:
       postgres_data:

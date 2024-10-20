@@ -14,13 +14,17 @@ class User(SQLModel, table=True):
 
 
 class ImageCategoryMapping(SQLModel, table=True):
+    __tablename__ = 'image_category_mapping'
+
     image_id: int = Field(foreign_key='image.id', primary_key=True)
     category_id: int = Field(foreign_key='image_category.id', primary_key=True)
 
 
 class ImageCategory(SQLModel, table=True):
+    __tablename__ = 'image_category'
+
     id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(index=True, max_length=63)
+    name: str = Field(unique=True, max_length=63)
     created_at: datetime = Field(
         sa_column=sa.Column(
             sa.DateTime(timezone=True),

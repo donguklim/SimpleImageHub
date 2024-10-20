@@ -14,6 +14,7 @@ bcrypt = "^4.2.0"
 ruff = "^0.7.0"
 sqlmodel = "^0.0.22"
 pydantic-settings = "^2.6.0"
+psycopg2 = "^2.9.10"
 
 
 [build-system]
