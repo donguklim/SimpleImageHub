@@ -24,6 +24,7 @@ ENV VIRTUAL_ENV=/app/.venv \
 
 COPY --from=builder ${VIRTUAL_ENV} ${VIRTUAL_ENV}
 
+COPY .env.docker ./.env
 COPY image_hub ./image_hub
 
 CMD ["fastapi", "run", "image_hub/main.py", "--port", "8000"]
