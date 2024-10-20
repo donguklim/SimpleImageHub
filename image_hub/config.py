@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix='hub_')
 
     database_url: str
+    database_sync_url: str
     auth_secret_key: str
     max_num_categories_per_image: int = 5
 
