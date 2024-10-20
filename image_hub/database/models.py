@@ -10,7 +10,7 @@ class User(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     user_name: str = Field(index=True, max_length=31, unique=True)
     password: str
-    role: int = Field(default=1)
+    is_admin: bool = Field(default=False)
 
 
 class ImageCategoryMapping(SQLModel, table=True):
