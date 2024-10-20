@@ -7,7 +7,7 @@ from fastapi import (
     Response,
     status,
 )
-from sqlmodel import select
+from sqlmodel import asc, desc, select, delete
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
@@ -20,8 +20,9 @@ from image_hub.auth.services import (
     get_user_id_and_is_admin_from_token,
     verify_password
 )
-from image_hub.database.models import User
+from image_hub.database.models import ImageCategory, User
 from image_hub.database.session import get_session
+from image_hub.image.dto import CategoryUpdateDto, CategoryInfoDto, CategoryListDto
 
 
 oauth2_scheme = TokenAuthScheme()
@@ -54,7 +55,11 @@ def get_admin_user(
 
 
 @app.post('/signup', status_code=status.HTTP_201_CREATED)
-async def signup(user_info:UserDto, response: Response, session: AsyncSession = Depends(get_session)) -> dict:
+async def signup(
+        user_info:UserDto,
+        response: Response,
+        session: AsyncSession = Depends(get_session)
+) -> dict:
     user = get_user_instance(user_info)
     session.add(user)
     try:
@@ -85,8 +90,100 @@ async def login(
 
 
 @app.get('/hello_user')
-async def hello_user(user_auth: Annotated[UserAuthDto, Depends(get_user_auth)]):
+async def hello_user(user_auth: Annotated[UserAuthDto, Depends(get_user_auth)]) -> dict:
     """
     Hello message api for testing if a user is logged in.
     """
     return dict(message=f'Hello {user_auth.user_id}', is_admin=user_auth.is_admin)
+
+
+@app.delete('/categories/{category_id}')
+async def delete_category_by_id(
+    category_id: int,
+    user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
+    response: Response,
+    session: AsyncSession = Depends(get_session)
+) -> dict:
+    await session.exec(
+        delete(ImageCategory).where(ImageCategory.id == category_id)
+    )
+    await session.commit()
+    return dict(message=f'Category with id {category_id} is deleted')
+
+@app.delete('/categories/')
+async def delete_category_by_name(
+    category: CategoryUpdateDto,
+    user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
+    session: AsyncSession = Depends(get_session)
+) -> dict:
+    name = category.name.upper()
+    await session.exec(
+        delete(ImageCategory).where(ImageCategory.name == name)
+    )
+    await session.commit()
+    return dict(message=f'Category {name} is deleted')
+
+
+@app.post('/categories/')
+async def create_category(
+    category: CategoryUpdateDto,
+    user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
+    response: Response,
+    session: AsyncSession = Depends(get_session)
+) -> dict:
+    name = category.name.upper()
+    session.add(ImageCategory(name=name))
+    try:
+        await session.commit()
+    except IntegrityError:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return dict(message=f'Category {name} already exists')
+
+    return dict(message=f'Category {name} is created')
+
+
+@app.get('/categories/')
+async def list_category(
+    user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
+    response: Response,
+    session: AsyncSession = Depends(get_session),
+    is_ascending: bool = True,
+    next_key: str | None = None,
+    size: int = 100,
+) -> CategoryListDto:
+    if size > 1000:
+        raise HTTPException(status_code=400, detail=f'size {size} exceeds 1000')
+
+    if is_ascending:
+        order = asc(ImageCategory.name)
+    else:
+        order = desc(ImageCategory.name)
+
+    query = select(ImageCategory)
+
+    if next_key and is_ascending:
+        query = query.where(
+            ImageCategory.name > next_key.upper()
+        )
+    elif next_key and not is_ascending:
+        query = query.where(
+            ImageCategory.name < next_key.upper()
+        )
+
+    result = await session.exec(
+        query.order_by(order).limit(size)
+    )
+
+    categories = [
+        CategoryInfoDto(
+            name=category.name,
+            id=category.id
+        ) for category in result
+    ]
+
+    if len(categories) < size:
+        returning_key = None
+    else:
+        returning_key = categories[-1].name
+
+    return CategoryListDto(next_key=returning_key, categories=categories)
