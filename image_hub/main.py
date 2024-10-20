@@ -81,7 +81,7 @@ async def login(
     if not verify_password(user_info.password, user.password):
         raise HTTPException(status_code=400, detail='wrong password')
 
-    return get_token(user.id)
+    return get_token(user.id, is_admin=user.is_admin)
 
 
 @app.get('/hello_user')
