@@ -29,7 +29,10 @@ class ImageCategory(SQLModel, table=True):
         )
     )
 
-    images: list['Image'] = Relationship(back_populates='categories', link_model=ImageCategoryMapping)
+    images: list['Image'] = Relationship(
+        back_populates='categories',
+        link_model=ImageCategoryMapping
+    )
 
 
 class Image(SQLModel, table=True):
@@ -53,4 +56,7 @@ class Image(SQLModel, table=True):
     description: str = Field(max_length=511)
     uploader_id: int = Field(foreign_key='user.id')
 
-    categories: list['ImageCategory'] = Relationship(back_populates='images', link_model=ImageCategoryMapping)
+    categories: list['ImageCategory'] = Relationship(
+        back_populates='images',
+        link_model=ImageCategoryMapping
+    )
