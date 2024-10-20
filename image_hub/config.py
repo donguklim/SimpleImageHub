@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     database_url: str
     database_sync_url: str
     auth_secret_key: str
+    image_path: str
     max_num_categories_per_image: int = 5
 
 

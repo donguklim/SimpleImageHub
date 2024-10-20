@@ -10,6 +10,8 @@ services:
       - postgres_db
     env_file:
       - .env.docker
+    volumes:
+       - ./images:/app/images
     ports:
       - "8000:8000"
     links:
