@@ -10,5 +10,5 @@ class CategoryInfoDto(BaseModel):
     name: str
 
 class CategoryListDto(BaseModel):
-    next_key: str | None
+    next_search_key: str | None
     categories: list[CategoryInfoDto]

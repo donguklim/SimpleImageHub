@@ -58,7 +58,8 @@ class Image(SQLModel, table=True):
         )
     )
     description: str = Field(max_length=511)
-    uploader_id: int = Field(foreign_key='user.id')
+    uploader_id: int = Field(foreign_key='user.id', nullable=True)
+    uploader_admin_id: int = Field(foreign_key='user.id', nullable=True)
 
     categories: list['ImageCategory'] = Relationship(
         back_populates='images',

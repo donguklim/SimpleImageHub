@@ -11,7 +11,7 @@ from sqlmodel import asc, desc, select, delete
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
-from image_hub.auth.bearer import TokenAuthScheme
+from image_hub.auth.auth_scheme import TokenAuthScheme
 from image_hub.auth.dto import Token, UserAuthDto, UserDto
 from image_hub.auth.errors import AuthTokenError
 from image_hub.auth.services import (
@@ -40,7 +40,7 @@ def get_user_auth(
     return UserAuthDto(user_id=user_id, is_admin=is_admin)
 
 
-def get_admin_user(
+def get_admin_user_id(
         token: Annotated[str, Depends(oauth2_scheme)],
 ) -> int:
     try:
@@ -100,7 +100,7 @@ async def hello_user(user_auth: Annotated[UserAuthDto, Depends(get_user_auth)]) 
 @app.delete('/categories/{category_id}')
 async def delete_category_by_id(
     category_id: int,
-    user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
+    admin_id: Annotated[int, Depends(get_admin_user_id)],
     response: Response,
     session: AsyncSession = Depends(get_session)
 ) -> dict:
@@ -109,6 +109,27 @@ async def delete_category_by_id(
     )
     await session.commit()
     return dict(message=f'Category with id {category_id} is deleted')
+
+
+@app.get('/categories/{category_id}')
+async def get_category_by_id(
+    category_id: int,
+    user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
+    session: AsyncSession = Depends(get_session)
+) -> CategoryInfoDto:
+    result = await session.exec(
+        select(ImageCategory).where(
+            ImageCategory.id == category_id,
+        )
+    )
+    category = result.first()
+    if not category:
+        raise HTTPException(status_code=404, detail=f'category {category_id} not found')
+
+    return CategoryInfoDto(
+        name=category.name,
+        id=category.id
+    )
 
 @app.delete('/categories/')
 async def delete_category_by_name(
@@ -145,10 +166,9 @@ async def create_category(
 @app.get('/categories/')
 async def list_category(
     user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
-    response: Response,
     session: AsyncSession = Depends(get_session),
     is_ascending: bool = True,
-    next_key: str | None = None,
+    search_key: str | None = None,
     size: int = 100,
 ) -> CategoryListDto:
     if size > 1000:
@@ -161,13 +181,13 @@ async def list_category(
 
     query = select(ImageCategory)
 
-    if next_key and is_ascending:
+    if search_key and is_ascending:
         query = query.where(
-            ImageCategory.name > next_key.upper()
+            ImageCategory.name > search_key.upper()
         )
-    elif next_key and not is_ascending:
+    elif search_key and not is_ascending:
         query = query.where(
-            ImageCategory.name < next_key.upper()
+            ImageCategory.name < search_key.upper()
         )
 
     result = await session.exec(
@@ -182,8 +202,8 @@ async def list_category(
     ]
 
     if len(categories) < size:
-        returning_key = None
+        next_search_key = None
     else:
-        returning_key = categories[-1].name
+        next_search_key = categories[-1].name
 
-    return CategoryListDto(next_key=returning_key, categories=categories)
+    return CategoryListDto(next_search_key=next_search_key, categories=categories)
