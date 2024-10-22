@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     auth_secret_key: str
     image_path: str
     max_num_categories_per_image: int = 5
+    image_file_size_limit_mb: int = 16
 
 
 @lru_cache

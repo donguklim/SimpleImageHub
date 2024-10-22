@@ -1,12 +1,16 @@
+import os
 from typing import Annotated
 
 from fastapi import (
     Depends,
     HTTPException,
     FastAPI,
+    Form,
     Response,
     status,
+UploadFile
 )
+from fastapi.responses import FileResponse
 from sqlmodel import asc, desc, select, delete
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.exc import IntegrityError
@@ -20,9 +24,12 @@ from image_hub.auth.services import (
     get_user_id_and_is_admin_from_token,
     verify_password
 )
-from image_hub.database.models import ImageCategory, User
+from image_hub.config import get_settings
+from image_hub.database.models import ImageCategory, ImageCategoryMapping, ImageInfo, User
 from image_hub.database.session import get_session
-from image_hub.image.dto import CategoryUpdateDto, CategoryInfoDto, CategoryListDto
+from image_hub.image.dto import ImageUploadForm, ImageInfoDto
+from image_hub.image_category.dto import CategoryUpdateDto, CategoryInfoDto, CategoryListDto
+from image_hub.utils import upload_file
 
 
 oauth2_scheme = TokenAuthScheme()
@@ -207,3 +214,96 @@ async def list_category(
         next_search_key = categories[-1].name
 
     return CategoryListDto(next_search_key=next_search_key, categories=categories)
+
+@app.get('/images/{image_id}/{file_name}')
+async def get_image_file(
+    image_id: int,
+    file_name: str,
+    user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
+) -> FileResponse:
+    file_path = os.path.join(
+        get_settings().image_path,
+        str(image_id),
+        file_name
+    )
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(file_path, media_type='image/png')
+
+
+@app.post('/images/')
+async def upload_image(
+    image: UploadFile,
+    categories:  Annotated[list[int], Form(max_length=5)],
+    description: Annotated[str, Form(max_length=511)],
+    user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
+    session: AsyncSession = Depends(get_session)
+) -> ImageInfoDto:
+
+    settings = get_settings()
+    if image.size > settings.image_file_size_limit_mb * 1024 * 1024:
+        raise HTTPException(
+            status_code=500,
+            detail=f'Image exceeds size limit of {settings.image_file_size_limit_mb}MB'
+        )
+
+    if user_auth.is_admin:
+        uploader_id = None,
+        uploader_admin_id = user_auth.user_id
+    else:
+        uploader_id = user_auth.user_id
+        uploader_admin_id = None
+
+    image_info = ImageInfo(
+        file_name=image.filename,
+        description=description,
+        uploader_id=uploader_id,
+        uploader_admin_id=uploader_admin_id
+    )
+    session.add(image_info)
+
+    await session.flush()
+
+    print('flushed ')
+    print(f'id is {image_info.id}')
+
+    image_id = image_info.id
+    for category_id in set(categories):
+        if category_id < 1:
+            continue
+
+        session.add(
+            ImageCategoryMapping(category_id=category_id, image_id=image_info.id)
+        )
+        print(f'caterogsdf {category_id}')
+
+    try:
+        await upload_file(
+            image,
+            os.path.join(
+                settings.image_path,
+                str(image_id),
+            )
+        )
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error))
+
+    await session.commit()
+
+    query = (
+        select(ImageCategory)
+        .join(ImageCategoryMapping)
+        .join(ImageInfo)
+        .where(ImageInfo.id == image_id)
+    )
+    result = await session.exec(query)
+
+    return ImageInfoDto(
+        id=image_id,
+        file_name=image.filename,
+        description=description,
+        image_url=f'/images/{image_id}/{image.filename}',
+        thumbnail_url='',
+        categories=[CategoryInfoDto(id=category.id, name=category.name) for category in result.all()],
+    )

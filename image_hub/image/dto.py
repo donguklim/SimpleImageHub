@@ -1,14 +1,19 @@
-from pydantic import BaseModel, Field
+from fastapi import UploadFile
+from pydantic import BaseModel, conlist, Field
+
+from image_hub.image_category.dto import CategoryInfoDto
 
 
-class CategoryUpdateDto(BaseModel):
-    name: str = Field(min_length=4, max_length=63)
+class ImageUploadForm(BaseModel):
+    image: UploadFile
+    categories: conlist(int, max_length=5)
+    description: str = Field(max_length=511)
 
 
-class CategoryInfoDto(BaseModel):
+class ImageInfoDto(BaseModel):
     id: int
-    name: str
-
-class CategoryListDto(BaseModel):
-    next_search_key: str | None
+    file_name: str
+    image_url: str
+    thumbnail_url: str
+    description: str
     categories: list[CategoryInfoDto]

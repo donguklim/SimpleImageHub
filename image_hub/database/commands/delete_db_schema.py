@@ -1,5 +1,5 @@
 from image_hub.database.db_schema  import destroy_db_schema
-from image_hub.database.models import User, Image, ImageCategory, ImageCategoryMapping   # noqa: F401
+from image_hub.database.models import User, ImageInfo, ImageCategory, ImageCategoryMapping   # noqa: F401
 
 
 if __name__ == '__main__':

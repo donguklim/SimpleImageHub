@@ -16,7 +16,7 @@ class User(SQLModel, table=True):
 class ImageCategoryMapping(SQLModel, table=True):
     __tablename__ = 'image_category_mapping'
 
-    image_id: int = Field(foreign_key='image.id', primary_key=True)
+    image_info_id: int = Field(foreign_key='image_info.id', primary_key=True)
     category_id: int = Field(foreign_key='image_category.id', primary_key=True)
 
 
@@ -33,15 +33,16 @@ class ImageCategory(SQLModel, table=True):
         )
     )
 
-    images: list['Image'] = Relationship(
+    images: list['ImageInfo'] = Relationship(
         back_populates='categories',
         link_model=ImageCategoryMapping
     )
 
 
-class Image(SQLModel, table=True):
+class ImageInfo(SQLModel, table=True):
+    __tablename__ = 'image_info'
     id: int | None = Field(default=None, primary_key=True)
-    file_name: str = Field(index=True, max_length=255)
+    file_name: str = Field(index=True, max_length=511)
     created_at: datetime = Field(
         sa_column=sa.Column(
             sa.DateTime(timezone=True),
