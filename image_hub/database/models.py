@@ -58,9 +58,9 @@ class ImageInfo(SQLModel, table=True):
             default=time_now
         )
     )
-    description: str = Field(max_length=511, nullable=True)
-    uploader_id: int = Field(foreign_key='user.id', nullable=True)
-    uploader_admin_id: int = Field(foreign_key='user.id', nullable=True)
+    description: str | None = Field(max_length=511, nullable=True)
+    uploader_id: int | None = Field(foreign_key='user.id', nullable=True)
+    uploader_admin_id: int | None = Field(foreign_key='user.id', nullable=True)
 
     categories: list['ImageCategory'] = Relationship(
         back_populates='images',

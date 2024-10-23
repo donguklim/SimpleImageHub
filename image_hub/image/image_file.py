@@ -64,7 +64,7 @@ async def upload_image_files(image_id:int, image_file: UploadFile):
     )
 
     thumbnail_directory = _get_thumbnail_save_directory(image_id)
-    
+
     with Image.open(file_path) as img:
         settings = get_settings()
         img = img.convert('RGB')

@@ -11,9 +11,10 @@ from fastapi import (
     UploadFile
 )
 from fastapi.responses import FileResponse
-from sqlmodel import asc, desc, select, delete
+from sqlmodel import asc, desc, select, delete, or_, and_
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.sql.operators import is_
 
 from image_hub.auth.auth_scheme import TokenAuthScheme
 from image_hub.auth.dto import Token, UserAuthDto, UserDto
@@ -66,6 +67,39 @@ def get_admin_user_id(
         raise HTTPException(404, detail='Only admins are allowed')
 
     return user_id
+
+
+async def check_image_access(
+    image_id: int,
+    user_auth: UserAuthDto,
+    session: AsyncSession
+):
+
+    if user_auth.is_admin:
+        query = select(ImageInfo.id).where(
+            ImageInfo.id == image_id
+        ).where(
+            or_(
+                ImageInfo.uploader_admin_id == user_auth.user_id,
+                is_(ImageInfo.uploader_admin_id, None)
+            )
+        )
+    else:
+        query = select(ImageInfo.id).where(
+            ImageInfo.id == image_id
+        ).where(
+            ImageInfo.uploader_id == user_auth.user_id
+        )
+
+    result = await session.exec(query)
+    returned_image_id = result.one_or_none()
+
+    if not returned_image_id:
+        raise HTTPException(
+            status_code=404,
+            detail=f'You do not have access to image {image_id}, or the image does not exist.'
+        )
+
 
 
 @app.post('/signup', status_code=status.HTTP_201_CREATED)
@@ -228,7 +262,10 @@ async def get_image_file(
     image_id: int,
     file_name: str,
     user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
+    session: AsyncSession = Depends(get_session)
 ) -> FileResponse:
+    await check_image_access(image_id, user_auth, session)
+
     file_path = get_original_image_file_path(image_id, file_name)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
@@ -240,12 +277,32 @@ async def get_image_file(
 async def get_thumbnail_image_file(
     image_id: int,
     user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
+    session: AsyncSession = Depends(get_session)
 ) -> FileResponse:
+    await check_image_access(image_id, user_auth, session)
+
     file_path = get_thumbnail_image_file_path(image_id)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
 
     return FileResponse(file_path, media_type='image/png')
+
+
+
+@app.delete('/images/{image_id}')
+async def delete_image(
+    image_id: int,
+    user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
+    session: AsyncSession = Depends(get_session)
+) -> dict[str, str]:
+    await check_image_access(image_id, user_auth, session)
+
+    delete_image_files(image_id)
+    await session.exec(
+        delete(ImageInfo).where(ImageInfo.id == image_id)
+    )
+    await session.commit()
+    return dict(message=f'Image id {image_id} is deleted')
 
 
 @app.post('/images/')
