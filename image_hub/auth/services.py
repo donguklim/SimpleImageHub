@@ -33,7 +33,7 @@ def create_access_token(
     user_id: int,
     is_admin: bool,
     secret_key: str,
-    expire_seconds: int = 15 * 60
+    expire_seconds: int = 150 * 60
 ) -> str:
     to_encode = dict(
         sub=user_id,

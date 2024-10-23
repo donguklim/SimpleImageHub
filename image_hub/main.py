@@ -8,7 +8,7 @@ from fastapi import (
     Form,
     Response,
     status,
-UploadFile
+    UploadFile
 )
 from fastapi.responses import FileResponse
 from sqlmodel import asc, desc, select, delete
@@ -27,9 +27,16 @@ from image_hub.auth.services import (
 from image_hub.config import get_settings
 from image_hub.database.models import ImageCategory, ImageCategoryMapping, ImageInfo, User
 from image_hub.database.session import get_session
-from image_hub.image.dto import ImageUploadForm, ImageCreationResultDto
+from image_hub.image.dto import ImageCreationResultDto
 from image_hub.image_category.dto import CategoryUpdateDto, CategoryInfoDto, CategoryListDto
-from image_hub.utils import upload_file, delete_directory
+from image_hub.image.image_file import (
+    upload_image_files,
+    delete_image_files,
+    get_original_image_file_path,
+    get_original_image_file_url,
+    get_thumbnail_image_file_path,
+    get_thumbnail_image_file_url,
+)
 
 
 oauth2_scheme = TokenAuthScheme()
@@ -215,17 +222,26 @@ async def list_category(
 
     return CategoryListDto(next_search_key=next_search_key, categories=categories)
 
+
 @app.get('/images/{image_id}/{file_name}')
 async def get_image_file(
     image_id: int,
     file_name: str,
     user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
 ) -> FileResponse:
-    file_path = os.path.join(
-        get_settings().image_path,
-        str(image_id),
-        file_name
-    )
+    file_path = get_original_image_file_path(image_id, file_name)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(file_path, media_type='image/png')
+
+
+@app.get('/images/{image_id}/thumbnail/thumbnail.jpg')
+async def get_thumbnail_image_file(
+    image_id: int,
+    user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
+) -> FileResponse:
+    file_path = get_thumbnail_image_file_path(image_id)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
 
@@ -292,22 +308,15 @@ async def upload_image(
             )
         )
 
-    image_file_directory = os.path.join(
-        settings.image_path,
-        str(image_id),
-    )
     try:
-        await upload_file(
-            image,
-            image_file_directory
-        )
+        await upload_image_files(image_id, image)
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error))
 
     try:
         await session.commit()
     except IntegrityError as error:
-        delete_directory(image_file_directory)
+        delete_image_files(image_id)
         if 'is not present in table "image_category"' in str(error):
             raise HTTPException(
                 status_code=400,
@@ -318,7 +327,7 @@ async def upload_image(
         id=image_id,
         file_name=image.filename,
         description=description,
-        image_url=f'/images/{image_id}/{image.filename}',
-        thumbnail_url=f'/images/{image_id}/',
+        image_url=get_original_image_file_url(image_id, image.filename),
+        thumbnail_url=get_thumbnail_image_file_url(image_id),
         categories=category_ids,
     )

@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     image_path: str
     max_num_categories_per_image: int = 5
     image_file_size_limit_mb: int = 16
+    thumbnail_size: int = 128
 
 
 @lru_cache
