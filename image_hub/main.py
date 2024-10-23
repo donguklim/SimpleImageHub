@@ -11,11 +11,11 @@ from fastapi import (
     UploadFile
 )
 from fastapi.responses import FileResponse
-from markdown_it.rules_inline import image
 from sqlmodel import asc, desc, select, delete, or_, and_
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.sql.operators import is_
+from sqlalchemy.orm import selectinload
 
 from image_hub.auth.auth_scheme import TokenAuthScheme
 from image_hub.auth.dto import Token, UserAuthDto, UserDto
@@ -29,7 +29,7 @@ from image_hub.auth.services import (
 from image_hub.config import get_settings
 from image_hub.database.models import ImageCategory, ImageCategoryMapping, ImageInfo, User
 from image_hub.database.session import get_session
-from image_hub.image.dto import ImageCreationResultDto, ImageInfoDto, ImageInfoListDto
+from image_hub.image.dto import ImageDetailDto, ImageCreationResultDto, ImageInfoDto, ImageInfoListDto
 from image_hub.image_category.dto import CategoryUpdateDto, CategoryInfoDto, CategoryListDto
 from image_hub.image.image_file import (
     upload_image_files,
@@ -258,7 +258,7 @@ async def list_category(
     return CategoryListDto(next_search_key=next_search_key, categories=categories)
 
 
-@app.get('/images/{image_id}/{file_name}')
+@app.get('/images/{image_id}/file/{file_name}')
 async def get_image_file(
     image_id: int,
     file_name: str,
@@ -303,6 +303,55 @@ async def delete_image(
     )
     await session.commit()
     return dict(message=f'Image id {image_id} is deleted')
+
+
+@app.get('/images/{image_id}')
+async def get_image_info(
+    image_id: int,
+    user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
+    session: AsyncSession = Depends(get_session)
+) -> ImageDetailDto:
+    if user_auth.is_admin:
+        query = select(ImageInfo).options(selectinload(ImageInfo.categories)).where(
+            ImageInfo.id == image_id
+        ).where(
+            or_(
+                ImageInfo.uploader_admin_id == user_auth.user_id,
+                is_(ImageInfo.uploader_admin_id, None)
+            )
+        ).options(selectinload(ImageInfo.categories))
+    else:
+        query = select(ImageInfo).options(selectinload(ImageInfo.categories)).where(
+            ImageInfo.id == image_id
+        ).where(
+            ImageInfo.uploader_id == user_auth.user_id
+        )
+
+    result = await session.exec(query)
+    image_info = result.one_or_none()
+
+    if not image_info:
+        raise HTTPException(
+            status_code=404,
+            detail=f'You do not have access to image {image_id}, or the image does not exist.'
+        )
+
+
+    return ImageDetailDto(
+        id=image_info.id,
+        file_name=image_info.file_name,
+        image_url=get_original_image_file_url(image_info.id, image_info.file_name),
+        thumbnail_url=get_thumbnail_image_file_url(image_info.id),
+        description=image_info.description,
+        uploader_id=image_info.uploader_id or image_info.uploader_admin_id,
+        created_at=image_info.created_at.isoformat(),
+        categories=[
+            CategoryInfoDto(
+                name=category.name,
+                id=category.id
+            ) for category in image_info.categories
+        ]
+    )
 
 
 def _get_admin_base_image_query(

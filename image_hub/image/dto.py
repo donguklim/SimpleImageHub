@@ -41,3 +41,7 @@ class ImageInfoDto(BaseModel):
 class ImageInfoListDto(BaseModel):
     images: list[ImageInfoDto]
     next_key: str | None
+
+
+class ImageDetailDto(ImageInfoDto):
+    categories: list[CategoryInfoDto]

@@ -77,7 +77,7 @@ async def upload_image_files(image_id:int, image_file: UploadFile):
 
 
 def get_original_image_file_url(image_id: int, image_file_name: str) -> str:
-    return f'/image/{image_id}/{image_file_name}'
+    return f'/image/{image_id}/file/{image_file_name}'
 
 
 def get_thumbnail_image_file_url(image_id: int) -> str:
