@@ -1,6 +1,5 @@
 from fastapi import UploadFile
 from pydantic import BaseModel, conlist, Field
-from sqlalchemy.sql.annotation import Annotated
 
 from image_hub.image_category.dto import CategoryInfoDto
 

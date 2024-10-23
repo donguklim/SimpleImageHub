@@ -83,9 +83,9 @@ def get_admin_user_id(
 
 @app.post('/signup', status_code=status.HTTP_201_CREATED)
 async def signup(
-        user_info:UserDto,
-        response: Response,
-        session: AsyncSession = Depends(get_session)
+    user_info:UserDto,
+    response: Response,
+    session: AsyncSession = Depends(get_session)
 ) -> dict:
     user = get_user_instance(user_info)
     session.add(user)
@@ -120,7 +120,6 @@ async def login(
 async def delete_category_by_id(
     category_id: int,
     admin_id: Annotated[int, Depends(get_admin_user_id)],
-    response: Response,
     session: AsyncSession = Depends(get_session)
 ) -> dict:
     await session.exec(
@@ -153,7 +152,7 @@ async def get_category_by_id(
 @app.delete('/categories/')
 async def delete_category_by_name(
     category: CategoryUpdateDto,
-    user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
+    admin_id: Annotated[int, Depends(get_admin_user_id)],
     session: AsyncSession = Depends(get_session)
 ) -> dict:
     name = category.name.upper()
@@ -305,7 +304,6 @@ async def get_image_info(
             status_code=404,
             detail=f'You do not have access to image {image_id}, or the image does not exist.'
         )
-
 
     return ImageDetailDto(
         id=image_info.id,

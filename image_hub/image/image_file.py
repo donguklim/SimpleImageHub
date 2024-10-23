@@ -6,7 +6,6 @@ from fastapi import UploadFile
 from PIL import Image
 
 from image_hub.config import get_settings
-from image_hub.database.models import ImageInfo
 from image_hub.utils import delete_directory
 
 
