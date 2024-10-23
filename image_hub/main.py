@@ -39,6 +39,11 @@ from image_hub.image.image_file import (
     get_thumbnail_image_file_path,
     get_thumbnail_image_file_url,
 )
+from image_hub.image.query import (
+    check_image_access,
+    get_admin_base_image_query,
+    get_user_base_image_query
+)
 
 
 oauth2_scheme = TokenAuthScheme()
@@ -68,39 +73,6 @@ def get_admin_user_id(
         raise HTTPException(404, detail='Only admins are allowed')
 
     return user_id
-
-
-async def check_image_access(
-    image_id: int,
-    user_auth: UserAuthDto,
-    session: AsyncSession
-):
-
-    if user_auth.is_admin:
-        query = select(ImageInfo.id).where(
-            ImageInfo.id == image_id
-        ).where(
-            or_(
-                ImageInfo.uploader_admin_id == user_auth.user_id,
-                is_(ImageInfo.uploader_admin_id, None)
-            )
-        )
-    else:
-        query = select(ImageInfo.id).where(
-            ImageInfo.id == image_id
-        ).where(
-            ImageInfo.uploader_id == user_auth.user_id
-        )
-
-    result = await session.exec(query)
-    returned_image_id = result.one_or_none()
-
-    if not returned_image_id:
-        raise HTTPException(
-            status_code=404,
-            detail=f'You do not have access to image {image_id}, or the image does not exist.'
-        )
-
 
 
 @app.post('/signup', status_code=status.HTTP_201_CREATED)
@@ -136,14 +108,6 @@ async def login(
         raise HTTPException(status_code=400, detail='wrong password')
 
     return get_token(user.id, is_admin=user.is_admin)
-
-
-@app.get('/hello_user')
-async def hello_user(user_auth: Annotated[UserAuthDto, Depends(get_user_auth)]) -> dict:
-    """
-    Hello message api for testing if a user is logged in.
-    """
-    return dict(message=f'Hello {user_auth.user_id}', is_admin=user_auth.is_admin)
 
 
 @app.delete('/categories/{category_id}')
@@ -354,73 +318,6 @@ async def get_image_info(
     )
 
 
-def _get_admin_base_image_query(
-    admin_id: int,
-    next_key: str | None = None,
-):
-    if next_key:
-        try:
-            is_fetch_owning_image, image_id_str = next_key.split('-')
-            image_id = int(image_id_str)
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f'next_key={next_key} not valid'
-            )
-
-        if is_fetch_owning_image:
-            query = select(ImageInfo).where(
-                or_(
-                    and_(
-                        ImageInfo.uploader_admin_id == admin_id,
-                        ImageInfo.id < image_id
-                    ),
-                    is_(ImageInfo.uploader_admin_id, None)
-                )
-            )
-        else:
-            query = select(ImageInfo).where(
-                is_(ImageInfo.uploader_admin_id, None),
-                ImageInfo.id < image_id
-
-            )
-    else:
-        query = select(ImageInfo).where(
-            or_(
-                ImageInfo.uploader_admin_id == admin_id,
-                is_(ImageInfo.uploader_admin_id, None)
-            )
-        )
-
-    return query.order_by(
-        asc(ImageInfo.uploader_admin_id),
-        desc(ImageInfo.id)
-    )
-
-
-def _get_user_base_image_query(user_id: int, next_key: str | None = None):
-    if next_key:
-        try:
-            image_id = int(next_key)
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f'next_key={next_key} not valid'
-            )
-
-        query = select(ImageInfo).where(
-            ImageInfo.uploader_id == user_id,
-            ImageInfo.id < image_id
-        )
-    else:
-        query = select(ImageInfo).where(
-            ImageInfo.uploader_id == user_id
-        )
-
-    return query.order_by(
-        desc(ImageInfo.id)
-    )
-
 @app.get('/images/')
 async def list_images(
     user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
@@ -429,9 +326,9 @@ async def list_images(
     size: int = 100,
 ):
     if user_auth.is_admin:
-        base_query = _get_admin_base_image_query(user_auth.user_id, next_key)
+        base_query = get_admin_base_image_query(user_auth.user_id, next_key)
     else:
-        base_query = _get_user_base_image_query(user_auth.user_id, next_key)
+        base_query = get_user_base_image_query(user_auth.user_id, next_key)
 
     result = await session.exec(
         base_query.limit(size)
