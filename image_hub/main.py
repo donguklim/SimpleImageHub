@@ -27,9 +27,9 @@ from image_hub.auth.services import (
 from image_hub.config import get_settings
 from image_hub.database.models import ImageCategory, ImageCategoryMapping, ImageInfo, User
 from image_hub.database.session import get_session
-from image_hub.image.dto import ImageUploadForm, ImageInfoDto
+from image_hub.image.dto import ImageUploadForm, ImageCreationResultDto
 from image_hub.image_category.dto import CategoryUpdateDto, CategoryInfoDto, CategoryListDto
-from image_hub.utils import upload_file
+from image_hub.utils import upload_file, delete_directory
 
 
 oauth2_scheme = TokenAuthScheme()
@@ -234,12 +234,30 @@ async def get_image_file(
 
 @app.post('/images/')
 async def upload_image(
-    image: UploadFile,
-    categories:  Annotated[list[int], Form(max_length=5)],
-    description: Annotated[str, Form(max_length=511)],
     user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
+    image: UploadFile,
+    categories: Annotated[str | None, Form()] = None,
+    description: Annotated[str | None, Form(max_length=511)] = None,
     session: AsyncSession = Depends(get_session)
-) -> ImageInfoDto:
+) -> ImageCreationResultDto:
+
+    try:
+        category_ids = list(
+            set([int(item) for item in categories.split(',')])
+        ) if categories else []
+    except ValueError:
+        raise HTTPException(
+            status_code=500,
+            detail=f'categories must be either null or '
+                   f'a comma separated integer strings, but the received input is "{categories}"'
+        )
+
+    if len(category_ids) > 5:
+        raise HTTPException(
+            status_code=500,
+            detail=f'number of categories must not exceed 5, '
+                   f'but {len(category_ids)} categories are received: {category_ids} '
+        )
 
     settings = get_settings()
     if image.size > settings.image_file_size_limit_mb * 1024 * 1024:
@@ -249,7 +267,7 @@ async def upload_image(
         )
 
     if user_auth.is_admin:
-        uploader_id = None,
+        uploader_id = None
         uploader_admin_id = user_auth.user_id
     else:
         uploader_id = user_auth.user_id
@@ -265,45 +283,42 @@ async def upload_image(
 
     await session.flush()
 
-    print('flushed ')
-    print(f'id is {image_info.id}')
-
     image_id = image_info.id
-    for category_id in set(categories):
-        if category_id < 1:
-            continue
-
+    for category_id in category_ids:
         session.add(
-            ImageCategoryMapping(category_id=category_id, image_id=image_info.id)
+            ImageCategoryMapping(
+                category_id=category_id,
+                image_info_id=image_info.id
+            )
         )
-        print(f'caterogsdf {category_id}')
 
+    image_file_directory = os.path.join(
+        settings.image_path,
+        str(image_id),
+    )
     try:
         await upload_file(
             image,
-            os.path.join(
-                settings.image_path,
-                str(image_id),
-            )
+            image_file_directory
         )
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error))
 
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as error:
+        delete_directory(image_file_directory)
+        if 'is not present in table "image_category"' in str(error):
+            raise HTTPException(
+                status_code=400,
+                detail=f'Some of the input category ids({category_ids}) do not exist!'
+            )
 
-    query = (
-        select(ImageCategory)
-        .join(ImageCategoryMapping)
-        .join(ImageInfo)
-        .where(ImageInfo.id == image_id)
-    )
-    result = await session.exec(query)
-
-    return ImageInfoDto(
+    return ImageCreationResultDto(
         id=image_id,
         file_name=image.filename,
         description=description,
         image_url=f'/images/{image_id}/{image.filename}',
-        thumbnail_url='',
-        categories=[CategoryInfoDto(id=category.id, name=category.name) for category in result.all()],
+        thumbnail_url=f'/images/{image_id}/',
+        categories=category_ids,
     )

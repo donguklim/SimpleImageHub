@@ -58,7 +58,7 @@ class ImageInfo(SQLModel, table=True):
             default=time_now
         )
     )
-    description: str = Field(max_length=511)
+    description: str = Field(max_length=511, nullable=True)
     uploader_id: int = Field(foreign_key='user.id', nullable=True)
     uploader_admin_id: int = Field(foreign_key='user.id', nullable=True)
 
