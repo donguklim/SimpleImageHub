@@ -11,6 +11,7 @@ from fastapi import (
     UploadFile
 )
 from fastapi.responses import FileResponse
+from markdown_it.rules_inline import image
 from sqlmodel import asc, desc, select, delete, or_, and_
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.exc import IntegrityError
@@ -28,7 +29,7 @@ from image_hub.auth.services import (
 from image_hub.config import get_settings
 from image_hub.database.models import ImageCategory, ImageCategoryMapping, ImageInfo, User
 from image_hub.database.session import get_session
-from image_hub.image.dto import ImageCreationResultDto
+from image_hub.image.dto import ImageCreationResultDto, ImageInfoDto, ImageInfoListDto
 from image_hub.image_category.dto import CategoryUpdateDto, CategoryInfoDto, CategoryListDto
 from image_hub.image.image_file import (
     upload_image_files,
@@ -288,7 +289,6 @@ async def get_thumbnail_image_file(
     return FileResponse(file_path, media_type='image/png')
 
 
-
 @app.delete('/images/{image_id}')
 async def delete_image(
     image_id: int,
@@ -303,6 +303,119 @@ async def delete_image(
     )
     await session.commit()
     return dict(message=f'Image id {image_id} is deleted')
+
+
+def _get_admin_base_image_query(
+    admin_id: int,
+    next_key: str | None = None,
+):
+    if next_key:
+        try:
+            is_fetch_owning_image, image_id_str = next_key.split('-')
+            image_id = int(image_id_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f'next_key={next_key} not valid'
+            )
+
+        if is_fetch_owning_image:
+            query = select(ImageInfo).where(
+                or_(
+                    and_(
+                        ImageInfo.uploader_admin_id == admin_id,
+                        ImageInfo.id < image_id
+                    ),
+                    is_(ImageInfo.uploader_admin_id, None)
+                )
+            )
+        else:
+            query = select(ImageInfo).where(
+                is_(ImageInfo.uploader_admin_id, None),
+                ImageInfo.id < image_id
+
+            )
+    else:
+        query = select(ImageInfo).where(
+            or_(
+                ImageInfo.uploader_admin_id == admin_id,
+                is_(ImageInfo.uploader_admin_id, None)
+            )
+        )
+
+    return query.order_by(
+        asc(ImageInfo.uploader_admin_id),
+        desc(ImageInfo.id)
+    )
+
+
+def _get_user_base_image_query(user_id: int, next_key: str | None = None):
+    if next_key:
+        try:
+            image_id = int(next_key)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f'next_key={next_key} not valid'
+            )
+
+        query = select(ImageInfo).where(
+            ImageInfo.uploader_id == user_id,
+            ImageInfo.id < image_id
+        )
+    else:
+        query = select(ImageInfo).where(
+            ImageInfo.uploader_id == user_id
+        )
+
+    return query.order_by(
+        desc(ImageInfo.id)
+    )
+
+@app.get('/images/')
+async def list_images(
+    user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
+    session: AsyncSession = Depends(get_session),
+    next_key: str | None = None,
+    size: int = 100,
+):
+    if user_auth.is_admin:
+        base_query = _get_admin_base_image_query(user_auth.user_id, next_key)
+    else:
+        base_query = _get_user_base_image_query(user_auth.user_id, next_key)
+
+    result = await session.exec(
+        base_query.limit(size)
+    )
+
+    images = [
+        ImageInfoDto(
+            id=image_info.id,
+            file_name=image_info.file_name,
+            image_url=get_original_image_file_url(image_info.id, image_info.file_name),
+            thumbnail_url=get_thumbnail_image_file_url(image_info.id),
+            description=image_info.description,
+            uploader_id=image_info.uploader_id or image_info.uploader_admin_id,
+            created_at=image_info.created_at.isoformat()
+        )
+        for image_info in result
+    ]
+
+    if len(images) < size:
+        next_key = None
+    elif user_auth.is_admin:
+        if images[-1].uploader_id == user_auth.user_id:
+            next_key = f'a-{images[-1].id}'
+        else:
+            next_key = f'-{images[-1].id}'
+
+    else:
+        next_key = str(images[-1].id)
+
+    return ImageInfoListDto(
+        images=images,
+        next_key=next_key
+    )
 
 
 @app.post('/images/')

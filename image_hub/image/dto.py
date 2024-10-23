@@ -26,3 +26,18 @@ class ImageCreationResultDto(BaseModel):
     thumbnail_url: str
     description: str | None
     categories: list[int]
+
+
+class ImageInfoDto(BaseModel):
+    id: int
+    file_name: str
+    image_url: str
+    thumbnail_url: str
+    description: str | None
+    uploader_id: int
+    created_at: str
+
+
+class ImageInfoListDto(BaseModel):
+    images: list[ImageInfoDto]
+    next_key: str | None
