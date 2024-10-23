@@ -1,5 +1,6 @@
 from fastapi import UploadFile
 from pydantic import BaseModel, conlist, Field
+from sqlalchemy.sql.annotation import Annotated
 
 from image_hub.image_category.dto import CategoryInfoDto
 
@@ -45,3 +46,9 @@ class ImageInfoListDto(BaseModel):
 
 class ImageDetailDto(ImageInfoDto):
     categories: list[CategoryInfoDto]
+
+
+class ImageUpdateDto(BaseModel):
+    description: str | None =  Field(None, max_length=511)
+    deleting_categories: list[int] | None = None
+    adding_categories: list[int] | None = None

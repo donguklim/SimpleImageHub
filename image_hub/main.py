@@ -11,10 +11,10 @@ from fastapi import (
     UploadFile
 )
 from fastapi.responses import FileResponse
-from sqlmodel import asc, desc, select, delete, or_, and_
+from sqlmodel import asc, desc, select, delete, or_
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.sql.operators import is_
+from sqlalchemy.sql.operators import is_, in_op
 from sqlalchemy.orm import selectinload
 
 from image_hub.auth.auth_scheme import TokenAuthScheme
@@ -29,7 +29,13 @@ from image_hub.auth.services import (
 from image_hub.config import get_settings
 from image_hub.database.models import ImageCategory, ImageCategoryMapping, ImageInfo, User
 from image_hub.database.session import get_session
-from image_hub.image.dto import ImageDetailDto, ImageCreationResultDto, ImageInfoDto, ImageInfoListDto
+from image_hub.image.dto import (
+    ImageDetailDto,
+    ImageCreationResultDto,
+    ImageInfoDto,
+    ImageInfoListDto,
+    ImageUpdateDto
+)
 from image_hub.image_category.dto import CategoryUpdateDto, CategoryInfoDto, CategoryListDto
 from image_hub.image.image_file import (
     upload_image_files,
@@ -316,6 +322,99 @@ async def get_image_info(
             ) for category in image_info.categories
         ]
     )
+
+
+@app.post('/images/{image_id}')
+async def update_image_info(
+    image_id: int,
+    update_dto: ImageUpdateDto,
+    user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
+    session: AsyncSession = Depends(get_session)
+) -> dict[str, str]:
+    if user_auth.is_admin:
+        query = select(ImageInfo).options(selectinload(ImageInfo.categories)).where(
+            ImageInfo.id == image_id
+        ).where(
+            or_(
+                ImageInfo.uploader_admin_id == user_auth.user_id,
+                is_(ImageInfo.uploader_admin_id, None)
+            )
+        ).options(selectinload(ImageInfo.categories))
+    else:
+        query = select(ImageInfo).options(selectinload(ImageInfo.categories)).where(
+            ImageInfo.id == image_id
+        ).where(
+            ImageInfo.uploader_id == user_auth.user_id
+        )
+
+    result = await session.exec(query)
+    image_info = result.one_or_none()
+    if not image_info:
+        raise HTTPException(
+            status_code=404,
+            detail=f'You do not have access to image {image_id}, or the image does not exist.'
+        )
+
+    if update_dto.description is not None:
+        description = update_dto.description.strip()
+        if description == '':
+            image_info.description = None
+        else:
+            image_info.description = description
+
+
+    deleting_ids = set(update_dto.deleting_categories or [])
+    adding_ids = set(update_dto.adding_categories or [])
+
+    interseting_ids = deleting_ids & adding_ids
+
+    # ignore interseting ids
+    deleting_ids = deleting_ids - interseting_ids
+    adding_ids = adding_ids - interseting_ids
+
+    category_ids = set([category.id for category in image_info.categories])
+    if deleting_ids:
+        deleting_ids = deleting_ids & category_ids
+        category_ids = category_ids - deleting_ids
+
+    num_updated_categories = len(category_ids | adding_ids)
+    settings = get_settings()
+    if num_updated_categories > settings.max_num_categories_per_image:
+        raise HTTPException(
+            status_code=400,
+            detail=f'Image {image_id} will have {num_updated_categories} categories, '
+                   f'exceeding the limit {settings.max_num_categories_per_image}'
+        )
+
+    await session.exec(
+        delete(ImageCategoryMapping).where(
+            ImageCategoryMapping.image_info_id == image_info.id,
+            in_op(ImageCategoryMapping.category_id, deleting_ids)
+        )
+    )
+
+    adding_ids = adding_ids - category_ids
+
+    for category_id in adding_ids:
+        session.add(
+            ImageCategoryMapping(
+                image_info_id=image_info.id,
+                category_id=category_id,
+            )
+        )
+
+    try:
+        await session.commit()
+    except IntegrityError as error:
+        if 'is not present in table "image_category"' in str(error):
+            raise HTTPException(
+                status_code=400,
+                detail=f'Some of the adding category ids({adding_ids}) do not exist!'
+            )
+
+    await session.commit()
+
+    return dict(message=f'image {image_id} updated')
 
 
 @app.get('/images/')
