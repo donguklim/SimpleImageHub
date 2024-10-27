@@ -2,7 +2,7 @@
 
 설치를 위해선 Docker, docker-compose가 필요.
 
-다음 두 커맨드를 실행하여 첫 빌드를 수행.
+다음 두 커맨드를 실행하여 첫 빌드와 DB Schema 생성을 실행.
 ```shell
 docker-compose build
 docker-compose run --rm backend python -m image_hub.database.commands.create_db_schema
@@ -13,7 +13,7 @@ docker-compose run --rm backend python -m image_hub.database.commands.create_db_
 docker-compose up
 ```
 
-이후는 다시 빌드만이 필요하면 docker-compose 빌드 커맨드를 사용.
+이후는 다시 빌드가 필요하면 docker-compose 빌드 커맨드를 사용.
 ```shell
 docker-compose build
 ```
@@ -38,7 +38,7 @@ docker-compose build
 docker-compose run --rm backend python -m image_hubF.database.commands.create_db_schema
 ```
 
-### DB 삭제 스크립트
+### DB Schema 삭제 스크립트
 [delete_db_schema.py](image_hub/database/commands/delete_db_schema.py)
 
 docker-compose를 사용해 실행.
@@ -48,6 +48,8 @@ docker-compose run --rm backend python -m image_hub.database.commands.delete_db_
 ```
 
 ## 샘플 데이터 추가
+
+### 커맨드
 
 ```shell
 docker-compose run --rm backend python -m image_hub.commands.create_sample_data
@@ -60,6 +62,14 @@ docker-compose run --rm backend python -m image_hub.commands.create_sample_data
 - `CATEGORY_1`, `CATEGORY_2`, ... `CATEGORY_50`라는 이름의 50개의 카테고리를 생성함.
 
 - 모든 유저의 패스워드는 `asdf`로 세팅되어 있고, 각 유저별로 해당 랜덤한 개수의 랜덤 이미지를 생성한다. (최소 1개)
+
+### 주의점
+
+샘플 데이터는 비어있는 DB에 실행되는 것을 전제로 만들어 졌기 때문에,
+혹시 DB에 추가된 데이터가 있다면 중복된 유저 아이디나 카테고리 이름으로 인해 에러가 날 수가 있습니다. 
+
+이경우 위의 DB Schema 삭제 스크립트를 실행 시켜서 기존의 데이터를 지우고 다시 DB Schema 생성 스크립트를 실행시킨 뒤에 
+샘플 데이터 추가 커맨들르 실행하십시오.
 
 ## API 문서
 
