@@ -47,3 +47,16 @@ docker-compose build
 docker-compose run --rm backend python -m image_hub.database.commands.delete_db_schema
 ```
 
+# 샘플 데이터 추가
+
+```shell
+docker-compose run --rm backend python -m image_hub.commands.create_sample_data
+```
+
+- `admin1`, `admin2`, ... `admin10` 아이디의 어드민 계정 10개를 생성함.
+
+- `user1`, `user2`, ... `user10` 아이디의 일반 유저 계정 10개를 생성함.
+
+- `CATEGORY_1`, `CATEGORY_2`, ... `CATEGORY_50`라는 이름의 50개의 카테고리를 생성함.
+
+- 모든 유저의 패스워드는 `asdf`로 세팅되어 있고, 각 유저별로 해당 랜덤한 개수의 랜덤 이미지를 생성한다. (최소 1개)

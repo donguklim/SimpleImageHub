@@ -16,8 +16,8 @@ class User(SQLModel, table=True):
 class ImageCategoryMapping(SQLModel, table=True):
     __tablename__ = 'image_category_mapping'
 
-    image_info_id: int = Field(foreign_key='image_info.id', primary_key=True)
-    category_id: int = Field(foreign_key='image_category.id', primary_key=True)
+    image_info_id: int = Field(foreign_key='image_info.id', primary_key=True, ondelete='CASCADE')
+    category_id: int = Field(foreign_key='image_category.id', primary_key=True, ondelete='CASCADE')
 
 
 class ImageCategory(SQLModel, table=True):

@@ -12,15 +12,15 @@ from image_hub.utils import delete_directory
 THUMBNAIL_FILE_NAME = 'thumbnail.jpg'
 
 
-def _get_original_image_save_directory(image_id: int):
+def get_original_image_save_directory(image_id: int):
     return os.path.join(
         get_settings().image_path,
         str(image_id),
     )
 
-def _get_thumbnail_save_directory(image_id: int):
+def get_thumbnail_save_directory(image_id: int):
     return os.path.join(
-        _get_original_image_save_directory(image_id),
+        get_original_image_save_directory(image_id),
         'thumbnail'
     )
 
@@ -52,17 +52,17 @@ async def save_image_async(
 
 
 def delete_image_files(image_id: int):
-    image_file_directory = _get_original_image_save_directory(image_id)
+    image_file_directory = get_original_image_save_directory(image_id)
     delete_directory(image_file_directory)
 
 
 async def upload_image_files(image_id:int, image_file: UploadFile):
     file_path = await upload_file(
         image_file,
-        _get_original_image_save_directory(image_id)
+        get_original_image_save_directory(image_id)
     )
 
-    thumbnail_directory = _get_thumbnail_save_directory(image_id)
+    thumbnail_directory = get_thumbnail_save_directory(image_id)
 
     with Image.open(file_path) as img:
         settings = get_settings()
@@ -85,13 +85,13 @@ def get_thumbnail_image_file_url(image_id: int) -> str:
 
 def get_original_image_file_path(image_id: int, image_file_name: str) -> str:
     return os.path.join(
-        _get_original_image_save_directory(image_id),
+        get_original_image_save_directory(image_id),
         image_file_name
     )
 
 
 def get_thumbnail_image_file_path(image_id: int) -> str:
     return os.path.join(
-        _get_thumbnail_save_directory(image_id),
+        get_thumbnail_save_directory(image_id),
         THUMBNAIL_FILE_NAME
     )

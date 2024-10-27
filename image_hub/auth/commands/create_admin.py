@@ -22,7 +22,8 @@ def create_admin(user_name: str, password: str):
         session.add(
             User(
                 user_name=user_name,
-                password=get_password_hash(password)
+                password=get_password_hash(password),
+                is_admin=True
             )
         )
         try:
