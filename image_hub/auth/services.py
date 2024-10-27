@@ -52,11 +52,11 @@ def decode_access_token(token: str, secret_key: str) -> dict:
     return jwt.decode(token, secret_key, algorithms=[ALGORITHM])
 
 
-def get_user_instance(user_info: UserDto) -> User:
+def get_user_instance(user_info: UserDto, is_admin: bool = False) -> User:
     user = User(
         password=get_password_hash(user_info.password),
         user_name=user_info.user_name,
-        is_admin=user_info.is_admin,
+        is_admin=is_admin,
     )
 
     return user
