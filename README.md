@@ -80,3 +80,19 @@ docker-compose run --rm backend python -m image_hub.commands.create_sample_data
 
 [ERD 파일](resources/db_schema.pgerd)
 ![](resources/image_hub_erd.png "Title")
+
+
+## Further Thoughts
+
+현재 생략한 기능이나 추가를 생각해 볼 수도 있는 것들.
+
+- DB 스키마를 삭제하고 다시 생성하는 방식으로만 Schema 수정을 실행하였기에 Schema 수정시 기존 데이터가 날아감.
+  - SQLAlchemy 전용 마이그레이션 라이브러리인 alembic을 사용한 DB mirgation 관리
+- 유닛테스트, 인터그레이션 테스트
+  - pytest등을 사용한 유닛 테스트 도입과 테스트 전용 DB를 생성하여 integration 테스트를 추가해서 코드를 더 안정적으로 관리.
+  - 시간 부족으로 생략.
+- 어드민과 유저 테이블 분리
+  - 현재 어드민과 유저가 같은 테이블을 공유하고 있지만, 어드민과 유저에게 필요한 정보가 후에 달라질 경우를 생각한다면 테이블을 분리를 생각해볼 필요가 있음.
+- S3같은 클라우드 서비스를 이용한 이미지 관리
+  - 현재 과제 요구 사항은 이미지를 서버에 직접 저장하는 것이었기에 사용안함.
+  - 만약 S3를 사용하는것을 전제로 만들 었다면 Localstack등의 AWS 에뮬레이터 컨테이너 등을 사용하여 로컬에서 boto3를 사용해서 S3를 사용하는 방향으로 설계할 수도.
