@@ -53,6 +53,14 @@ from image_hub.image.query import (
 
 
 oauth2_scheme = TokenAuthScheme()
+
+tags_metadata = [
+    dict(name='auth'),
+    dict(name='category'),
+    dict(name='image_info'),
+]
+
+app = FastAPI(openapi_tags=tags_metadata)
 app = FastAPI()
 
 
@@ -81,7 +89,7 @@ def get_admin_user_id(
     return user_id
 
 
-@app.post('/signup', status_code=status.HTTP_201_CREATED)
+@app.post('/signup', status_code=status.HTTP_201_CREATED, tags=['auth'])
 async def signup(
     user_info:UserDto,
     response: Response,
@@ -98,7 +106,7 @@ async def signup(
     return dict(message=f'user {user_info.user_name} is created')
 
 
-@app.post('/login')
+@app.post('/login', tags=['auth'])
 async def login(
     user_info:UserDto,
     session: AsyncSession = Depends(get_session)
@@ -116,7 +124,7 @@ async def login(
     return get_token(user.id, is_admin=user.is_admin)
 
 
-@app.delete('/categories/{category_id}')
+@app.delete('/categories/{category_id}', tags=['category'])
 async def delete_category_by_id(
     category_id: int,
     admin_id: Annotated[int, Depends(get_admin_user_id)],
@@ -129,7 +137,7 @@ async def delete_category_by_id(
     return dict(message=f'Category with id {category_id} is deleted')
 
 
-@app.get('/categories/{category_id}')
+@app.get('/categories/{category_id}', tags=['category'])
 async def get_category_by_id(
     category_id: int,
     user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
@@ -149,7 +157,7 @@ async def get_category_by_id(
         id=category.id
     )
 
-@app.delete('/categories/')
+@app.delete('/categories/', tags=['category'])
 async def delete_category_by_name(
     category: CategoryUpdateDto,
     admin_id: Annotated[int, Depends(get_admin_user_id)],
@@ -163,7 +171,7 @@ async def delete_category_by_name(
     return dict(message=f'Category {name} is deleted')
 
 
-@app.post('/categories/')
+@app.post('/categories/', tags=['category'])
 async def create_category(
     category: CategoryUpdateDto,
     user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
@@ -181,7 +189,7 @@ async def create_category(
     return dict(message=f'Category {name} is created')
 
 
-@app.get('/categories/')
+@app.get('/categories/', tags=['category'])
 async def list_category(
     user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
     session: AsyncSession = Depends(get_session),
@@ -227,7 +235,7 @@ async def list_category(
     return CategoryListDto(next_search_key=next_search_key, categories=categories)
 
 
-@app.get('/images/{image_id}/file/{file_name}')
+@app.get('/images/{image_id}/file/{file_name}', tags=['image_info'])
 async def get_image_file(
     image_id: int,
     file_name: str,
@@ -243,7 +251,7 @@ async def get_image_file(
     return FileResponse(file_path, media_type='image/png')
 
 
-@app.get('/images/{image_id}/thumbnail/thumbnail.jpg')
+@app.get('/images/{image_id}/thumbnail/thumbnail.jpg', tags=['image_info'])
 async def get_thumbnail_image_file(
     image_id: int,
     user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
@@ -258,7 +266,7 @@ async def get_thumbnail_image_file(
     return FileResponse(file_path, media_type='image/png')
 
 
-@app.delete('/images/{image_id}')
+@app.delete('/images/{image_id}', tags=['image_info'])
 async def delete_image(
     image_id: int,
     user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
@@ -274,7 +282,7 @@ async def delete_image(
     return dict(message=f'Image id {image_id} is deleted')
 
 
-@app.get('/images/{image_id}')
+@app.get('/images/{image_id}', tags=['image_info'])
 async def get_image_info(
     image_id: int,
     user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
@@ -322,7 +330,7 @@ async def get_image_info(
     )
 
 
-@app.post('/images/{image_id}')
+@app.post('/images/{image_id}', tags=['image_info'])
 async def update_image_info(
     image_id: int,
     update_dto: ImageUpdateDto,
@@ -415,7 +423,7 @@ async def update_image_info(
     return dict(message=f'image {image_id} updated')
 
 
-@app.get('/images/')
+@app.get('/images/', tags=['image_info'])
 async def list_images(
     user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
     session: AsyncSession = Depends(get_session),
@@ -461,7 +469,7 @@ async def list_images(
     )
 
 
-@app.post('/images/')
+@app.post('/images/', tags=['image_info'])
 async def upload_image(
     user_auth: Annotated[UserAuthDto, Depends(get_user_auth)],
     image: UploadFile,
