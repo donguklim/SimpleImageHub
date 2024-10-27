@@ -75,6 +75,13 @@ docker-compose run --rm backend python -m image_hub.commands.create_sample_data
 
 `http://localhost:8000/docs` 주소에 Swagger 페이지가 있습니다.
 
+### Swagger에서 로그인
+
+로그인 API 실행후 리턴된 Json에서 `access_token` 키에 있는 값을 복사후, 
+Swagger 페이지 오른쪽 상단에 있는 `Authorize` 버튼을 누르면 나오는 팝업창에 있는 `value`란에 붙여넣고,
+팝업창에 있는 `Authorize` 버튼을 클릭.
+
+
 
 ## DB Schema
 
