@@ -61,7 +61,6 @@ tags_metadata = [
 ]
 
 app = FastAPI(openapi_tags=tags_metadata)
-app = FastAPI()
 
 
 def get_user_auth(
